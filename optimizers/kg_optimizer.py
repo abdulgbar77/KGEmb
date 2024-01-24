@@ -5,6 +5,8 @@ import torch.nn.functional as F
 import tqdm
 from torch import nn
 
+from optimizers.focal import FocalLoss
+
 
 class KGOptimizer(object):
     """Knowledge Graph embedding model optimizer.
@@ -29,7 +31,7 @@ class KGOptimizer(object):
         self.batch_size = batch_size
         self.verbose = verbose
         self.double_neg = double_neg
-        self.loss_fn = nn.CrossEntropyLoss(reduction='mean')
+        self.loss_fn = FocalLoss()
         self.neg_sample_size = neg_sample_size
         self.n_entities = model.sizes[0]
 
@@ -76,13 +78,18 @@ class KGOptimizer(object):
             loss: torch.Tensor with negative sampling embedding loss
             factors: torch.Tensor with embeddings weights to regularize
         """
+        
         # positive samples
         positive_score, factors = self.model(input_batch)
+        print("positive_score shape",positive_score.shape())
+        truth = input_batch[:, 2]
         positive_score = F.logsigmoid(positive_score)
 
         # negative samples 
         neg_samples = self.get_neg_samples(input_batch)
         negative_score, _ = self.model(neg_samples)
+        print("negative_score shape", negative_score.shape())
+        
         negative_score = F.logsigmoid(-negative_score)
         loss = - torch.cat([positive_score, negative_score], dim=0).mean()
         return loss, factors
